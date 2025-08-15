@@ -1,0 +1,25 @@
+# Global owners
+* @camino-ai/core-team
+
+# Python SDK
+/python/ @camino-ai/python-team @camino-ai/core-team
+
+# JavaScript SDK
+/javascript/ @camino-ai/javascript-team @camino-ai/core-team
+
+# CI/CD and workflows
+/.github/ @camino-ai/devops-team @camino-ai/core-team
+
+# OpenAPI specification
+/openapi/ @camino-ai/api-team @camino-ai/core-team
+
+# Documentation
+/docs/ @camino-ai/docs-team @camino-ai/core-team
+/examples/ @camino-ai/docs-team @camino-ai/core-team
+README.md @camino-ai/docs-team @camino-ai/core-team
+
+# Root configuration files
+/*.json @camino-ai/core-team
+/*.js @camino-ai/core-team
+/*.yml @camino-ai/core-team
+/*.yaml @camino-ai/core-team

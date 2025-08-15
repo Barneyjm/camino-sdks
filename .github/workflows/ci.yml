@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-python:
+    name: Test Python SDK
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: python/.venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('python/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        working-directory: ./python
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        working-directory: ./python
+        run: poetry install --no-interaction
+
+      - name: Run linting
+        working-directory: ./python
+        run: |
+          poetry run flake8 camino_ai tests
+          poetry run black --check camino_ai tests
+          poetry run isort --check-only camino_ai tests
+
+      - name: Run type checking
+        working-directory: ./python
+        run: poetry run mypy camino_ai
+
+      - name: Run tests
+        working-directory: ./python
+        run: poetry run pytest --cov=camino_ai --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./python/coverage.xml
+          flags: python
+          name: python-${{ matrix.python-version }}
+
+  test-javascript:
+    name: Test JavaScript SDK
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+          cache-dependency-path: javascript/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./javascript
+        run: npm ci
+
+      - name: Run linting
+        working-directory: ./javascript
+        run: npm run lint
+
+      - name: Run type checking
+        working-directory: ./javascript
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        working-directory: ./javascript
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./javascript/coverage/lcov.info
+          flags: javascript
+          name: javascript-${{ matrix.node-version }}
+
+  build-javascript:
+    name: Build JavaScript SDK
+    runs-on: ubuntu-latest
+    needs: test-javascript
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: javascript/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./javascript
+        run: npm ci
+
+      - name: Build package
+        working-directory: ./javascript
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: javascript-build
+          path: javascript/dist/
+          retention-days: 7
+
+  build-python:
+    name: Build Python SDK
+    runs-on: ubuntu-latest
+    needs: test-python
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        working-directory: ./python
+        run: poetry install --no-interaction
+
+      - name: Build package
+        working-directory: ./python
+        run: poetry build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-build
+          path: python/dist/
+          retention-days: 7
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Check Python dependencies for known vulnerabilities
+        working-directory: ./python
+        run: |
+          pip install safety
+          safety check
+
+      - name: Check JavaScript dependencies for known vulnerabilities
+        working-directory: ./javascript
+        run: npm audit --audit-level moderate

@@ -1,0 +1,111 @@
+name: Update OpenAPI Spec
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update even if spec unchanged'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  update-spec:
+    name: Update OpenAPI Specification
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Download latest OpenAPI spec
+      run: |
+        curl -o openapi/camino-openapi-new.json https://app.getcamino.ai/openapi.json
+
+    - name: Check for changes
+      id: check-changes
+      run: |
+        if cmp -s openapi/camino-openapi.json openapi/camino-openapi-new.json; then
+          echo "No changes detected in OpenAPI spec"
+          echo "changed=false" >> $GITHUB_OUTPUT
+        else
+          echo "Changes detected in OpenAPI spec"
+          echo "changed=true" >> $GITHUB_OUTPUT
+          mv openapi/camino-openapi-new.json openapi/camino-openapi.json
+        fi
+
+    - name: Set up Node.js
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+
+    - name: Install dependencies
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      run: npm install
+
+    - name: Regenerate SDKs
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      run: |
+        npm run generate
+        
+    - name: Set up Python
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Test Python SDK
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      working-directory: ./python
+      run: |
+        pip install poetry
+        poetry install
+        poetry run pytest --maxfail=1
+
+    - name: Test JavaScript SDK
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      working-directory: ./javascript
+      run: |
+        npm ci
+        npm run test
+
+    - name: Create Pull Request
+      if: steps.check-changes.outputs.changed == 'true' || github.event.inputs.force_update == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: |
+          feat: update OpenAPI spec and regenerate SDKs
+          
+          - Updated OpenAPI specification from upstream
+          - Regenerated Python and JavaScript SDKs
+          - All tests passing
+        title: 'feat: update OpenAPI spec and regenerate SDKs'
+        body: |
+          ## 🔄 Automated OpenAPI Spec Update
+          
+          This PR contains updates to the OpenAPI specification and regenerated SDKs.
+          
+          ### Changes
+          - ✅ Updated OpenAPI specification from https://app.getcamino.ai/openapi.json
+          - ✅ Regenerated Python SDK
+          - ✅ Regenerated JavaScript/TypeScript SDK
+          - ✅ All tests passing
+          
+          ### Review Checklist
+          - [ ] Review OpenAPI spec changes
+          - [ ] Test SDK functionality
+          - [ ] Check for breaking changes
+          - [ ] Update version numbers if needed
+          
+          This PR was automatically created by the Update OpenAPI Spec workflow.
+        branch: update-openapi-spec
+        delete-branch: true
+        draft: false

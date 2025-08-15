@@ -1,0 +1,632 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Camino AI - Reality Grounding API",
+        "description": "Guide your AI agents through the real world with location intelligence, spatial reasoning, and route planning.",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080",
+            "description": "Local Development"
+        },
+        {
+            "url": "https://api.getcamino.ai",
+            "description": "Production"
+        }
+    ],
+    "paths": {
+        "/query": {
+            "get": {
+                "tags": [
+                    "Query"
+                ],
+                "summary": "Query Overpass",
+                "description": "Takes a natural language query and a location, converts it to an Overpass query,\nand returns matching points of interest in a clean, AI-friendly format.\nResults are automatically ranked by relevance using AI.",
+                "operationId": "query_overpass_query_get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Natural language query, e.g., \"coffee near me\"",
+                            "title": "Q"
+                        },
+                        "description": "Natural language query, e.g., \"coffee near me\""
+                    },
+                    {
+                        "name": "lat",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Latitude for the center of your search",
+                            "title": "Lat"
+                        },
+                        "description": "Latitude for the center of your search"
+                    },
+                    {
+                        "name": "lon",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Longitude for the center of your search",
+                            "title": "Lon"
+                        },
+                        "description": "Longitude for the center of your search"
+                    },
+                    {
+                        "name": "radius",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Search radius in meters. Only used if lat/lon are provided.",
+                            "title": "Radius"
+                        },
+                        "description": "Search radius in meters. Only used if lat/lon are provided."
+                    },
+                    {
+                        "name": "rank",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "description": "Use AI to rank results by relevance (default: true)",
+                            "default": true,
+                            "title": "Rank"
+                        },
+                        "description": "Use AI to rank results by relevance (default: true)"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "description": "Maximum number of results to return (1-100, default: 20)",
+                            "default": 20,
+                            "title": "Limit"
+                        },
+                        "description": "Maximum number of results to return (1-100, default: 20)"
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of results to skip for pagination (default: 0)",
+                            "default": 0,
+                            "title": "Offset"
+                        },
+                        "description": "Number of results to skip for pagination (default: 0)"
+                    },
+                    {
+                        "name": "answer",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "description": "Generate a human-readable answer summary (default: false)",
+                            "default": false,
+                            "title": "Answer"
+                        },
+                        "description": "Generate a human-readable answer summary (default: false)"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/relationship": {
+            "post": {
+                "tags": [
+                    "Spatial"
+                ],
+                "summary": "Spatial Relationship",
+                "description": "Calculate spatial relationships between two points including distance, \ndirection, travel time estimates, and human-readable description.",
+                "operationId": "spatial_relationship_relationship_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RelationshipRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/context": {
+            "post": {
+                "tags": [
+                    "Spatial"
+                ],
+                "summary": "Place Context",
+                "description": "Get context-aware information about a location including nearby places,\narea description, accessibility info, and local context.",
+                "operationId": "place_context_context_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContextRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/journey": {
+            "post": {
+                "tags": [
+                    "Spatial"
+                ],
+                "summary": "Journey Planner",
+                "description": "Multi-waypoint journey planning with route optimization, feasibility analysis,\nand intelligent recommendations for AI agents.",
+                "operationId": "journey_planner_journey_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/JourneyRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ]
+            }
+        },
+        "/route": {
+            "get": {
+                "tags": [
+                    "Routing"
+                ],
+                "summary": "Get Route",
+                "description": "Provides routing from a start to an end point using the OSRM API.\nSet include_geometry=true to get detailed route data for mapping and visualization.",
+                "operationId": "get_route_route_get",
+                "security": [
+                    {
+                        "APIKeyHeader": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "start_lat",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "description": "Start latitude",
+                            "title": "Start Lat"
+                        },
+                        "description": "Start latitude"
+                    },
+                    {
+                        "name": "start_lon",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "description": "Start longitude",
+                            "title": "Start Lon"
+                        },
+                        "description": "Start longitude"
+                    },
+                    {
+                        "name": "end_lat",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "description": "End latitude",
+                            "title": "End Lat"
+                        },
+                        "description": "End latitude"
+                    },
+                    {
+                        "name": "end_lon",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "description": "End longitude",
+                            "title": "End Lon"
+                        },
+                        "description": "End longitude"
+                    },
+                    {
+                        "name": "mode",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "$ref": "#/components/schemas/RouteMode",
+                            "description": "Mode of transport",
+                            "default": "car"
+                        },
+                        "description": "Mode of transport"
+                    },
+                    {
+                        "name": "include_geometry",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "description": "Include detailed route geometry and waypoints for mapping (default: false)",
+                            "default": false,
+                            "title": "Include Geometry"
+                        },
+                        "description": "Include detailed route geometry and waypoints for mapping (default: false)"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ContextRequest": {
+                "properties": {
+                    "location": {
+                        "$ref": "#/components/schemas/Coordinate"
+                    },
+                    "radius": {
+                        "type": "string",
+                        "title": "Radius",
+                        "default": "500m"
+                    },
+                    "context": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "location"
+                ],
+                "title": "ContextRequest"
+            },
+            "Coordinate": {
+                "properties": {
+                    "lat": {
+                        "type": "number",
+                        "title": "Lat"
+                    },
+                    "lng": {
+                        "type": "number",
+                        "title": "Lng"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "lat",
+                    "lng"
+                ],
+                "title": "Coordinate"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "JourneyConstraints": {
+                "properties": {
+                    "time_budget": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Time Budget"
+                    },
+                    "transport": {
+                        "type": "string",
+                        "title": "Transport",
+                        "default": "walking"
+                    },
+                    "preferences": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Preferences",
+                        "default": []
+                    }
+                },
+                "type": "object",
+                "title": "JourneyConstraints"
+            },
+            "JourneyRequest": {
+                "properties": {
+                    "waypoints": {
+                        "items": {
+                            "$ref": "#/components/schemas/Waypoint"
+                        },
+                        "type": "array",
+                        "title": "Waypoints"
+                    },
+                    "constraints": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/JourneyConstraints"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "waypoints"
+                ],
+                "title": "JourneyRequest"
+            },
+            "RelationshipRequest": {
+                "properties": {
+                    "from": {
+                        "$ref": "#/components/schemas/Coordinate"
+                    },
+                    "to": {
+                        "$ref": "#/components/schemas/Coordinate"
+                    },
+                    "include": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Include",
+                        "default": [
+                            "distance",
+                            "direction",
+                            "travel_time",
+                            "description"
+                        ]
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "from",
+                    "to"
+                ],
+                "title": "RelationshipRequest"
+            },
+            "RouteMode": {
+                "type": "string",
+                "enum": [
+                    "car",
+                    "bike",
+                    "foot"
+                ],
+                "title": "RouteMode"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            },
+            "Waypoint": {
+                "properties": {
+                    "lat": {
+                        "type": "number",
+                        "title": "Lat"
+                    },
+                    "lng": {
+                        "type": "number",
+                        "title": "Lng"
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "title": "Purpose"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "lat",
+                    "lng",
+                    "purpose"
+                ],
+                "title": "Waypoint"
+            }
+        },
+        "securitySchemes": {
+            "APIKeyHeader": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key"
+            }
+        }
+    }
+}

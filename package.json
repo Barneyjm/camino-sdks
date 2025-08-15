@@ -1,0 +1,27 @@
+{
+  "name": "@camino-ai/sdks",
+  "version": "0.1.0",
+  "description": "Camino AI SDKs for Python and JavaScript",
+  "private": true,
+  "workspaces": [
+    "javascript",
+    "python"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "clean": "npm run clean --workspaces",
+    "generate": "node tools/generate-sdks.js",
+    "publish-all": "npm run publish --workspaces"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.13.12"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/camino-ai/camino-sdks.git"
+  },
+  "author": "Camino AI",
+  "license": "MIT"
+}

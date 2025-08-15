@@ -1,0 +1,243 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'python-v*'
+      - 'javascript-v*'
+
+jobs:
+  determine-release-type:
+    name: Determine Release Type
+    runs-on: ubuntu-latest
+    outputs:
+      release-python: ${{ steps.check.outputs.python }}
+      release-javascript: ${{ steps.check.outputs.javascript }}
+      tag: ${{ steps.check.outputs.tag }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+    - name: Check tag
+      id: check
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        
+        if [[ $TAG == python-v* ]]; then
+          echo "python=true" >> $GITHUB_OUTPUT
+          echo "javascript=false" >> $GITHUB_OUTPUT
+          echo "version=${TAG#python-v}" >> $GITHUB_OUTPUT
+        elif [[ $TAG == javascript-v* ]]; then
+          echo "python=false" >> $GITHUB_OUTPUT
+          echo "javascript=true" >> $GITHUB_OUTPUT
+          echo "version=${TAG#javascript-v}" >> $GITHUB_OUTPUT
+        elif [[ $TAG == v* ]]; then
+          echo "python=true" >> $GITHUB_OUTPUT
+          echo "javascript=true" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+        else
+          echo "python=false" >> $GITHUB_OUTPUT
+          echo "javascript=false" >> $GITHUB_OUTPUT
+          echo "version=unknown" >> $GITHUB_OUTPUT
+        fi
+
+  test-before-release:
+    name: Test Before Release
+    runs-on: ubuntu-latest
+    needs: determine-release-type
+    if: needs.determine-release-type.outputs.release-python == 'true' || needs.determine-release-type.outputs.release-javascript == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      if: needs.determine-release-type.outputs.release-python == 'true'
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Set up Node.js
+      if: needs.determine-release-type.outputs.release-javascript == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Test Python SDK
+      if: needs.determine-release-type.outputs.release-python == 'true'
+      working-directory: ./python
+      run: |
+        pip install poetry
+        poetry install
+        poetry run pytest
+        poetry run mypy camino_ai
+
+    - name: Test JavaScript SDK
+      if: needs.determine-release-type.outputs.release-javascript == 'true'
+      working-directory: ./javascript
+      run: |
+        npm ci
+        npm run test
+        npm run lint
+        npx tsc --noEmit
+
+  release-python:
+    name: Release Python SDK
+    runs-on: ubuntu-latest
+    needs: [determine-release-type, test-before-release]
+    if: needs.determine-release-type.outputs.release-python == 'true'
+    environment:
+      name: pypi
+      url: https://pypi.org/project/camino-ai-sdk/
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+
+    - name: Update version in pyproject.toml
+      working-directory: ./python
+      run: |
+        poetry version ${{ needs.determine-release-type.outputs.version }}
+
+    - name: Build package
+      working-directory: ./python
+      run: |
+        poetry install
+        poetry build
+
+    - name: Verify package
+      working-directory: ./python
+      run: |
+        pip install twine
+        twine check dist/*
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: python/dist/
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.determine-release-type.outputs.tag }}
+        name: Python SDK v${{ needs.determine-release-type.outputs.version }}
+        body: |
+          ## Python SDK v${{ needs.determine-release-type.outputs.version }}
+          
+          ### Installation
+          ```bash
+          pip install camino-ai-sdk==${{ needs.determine-release-type.outputs.version }}
+          ```
+          
+          ### Changes
+          See [CHANGELOG.md](python/CHANGELOG.md) for details.
+        files: python/dist/*
+        draft: false
+        prerelease: ${{ contains(needs.determine-release-type.outputs.version, 'alpha') || contains(needs.determine-release-type.outputs.version, 'beta') || contains(needs.determine-release-type.outputs.version, 'rc') }}
+
+  release-javascript:
+    name: Release JavaScript SDK
+    runs-on: ubuntu-latest
+    needs: [determine-release-type, test-before-release]
+    if: needs.determine-release-type.outputs.release-javascript == 'true'
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@camino-ai/sdk
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Install dependencies
+      working-directory: ./javascript
+      run: npm ci
+
+    - name: Update version in package.json
+      working-directory: ./javascript
+      run: |
+        npm version ${{ needs.determine-release-type.outputs.version }} --no-git-tag-version
+
+    - name: Build package
+      working-directory: ./javascript
+      run: npm run build
+
+    - name: Run prepublish checks
+      working-directory: ./javascript
+      run: |
+        npm run test
+        npm run lint
+
+    - name: Publish to npm
+      working-directory: ./javascript
+      run: |
+        if [[ "${{ needs.determine-release-type.outputs.version }}" == *"alpha"* ]] || [[ "${{ needs.determine-release-type.outputs.version }}" == *"beta"* ]] || [[ "${{ needs.determine-release-type.outputs.version }}" == *"rc"* ]]; then
+          npm publish --tag next --provenance
+        else
+          npm publish --provenance
+        fi
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.determine-release-type.outputs.tag }}
+        name: JavaScript SDK v${{ needs.determine-release-type.outputs.version }}
+        body: |
+          ## JavaScript SDK v${{ needs.determine-release-type.outputs.version }}
+          
+          ### Installation
+          ```bash
+          npm install @camino-ai/sdk@${{ needs.determine-release-type.outputs.version }}
+          ```
+          
+          ### Changes
+          See [CHANGELOG.md](javascript/CHANGELOG.md) for details.
+        files: javascript/dist/**/*
+        draft: false
+        prerelease: ${{ contains(needs.determine-release-type.outputs.version, 'alpha') || contains(needs.determine-release-type.outputs.version, 'beta') || contains(needs.determine-release-type.outputs.version, 'rc') }}
+
+  post-release:
+    name: Post-release Actions
+    runs-on: ubuntu-latest
+    needs: [determine-release-type, release-python, release-javascript]
+    if: always() && (needs.release-python.result == 'success' || needs.release-javascript.result == 'success')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Update documentation
+      run: |
+        echo "Update documentation for version ${{ needs.determine-release-type.outputs.version }}"
+        # Add steps to update documentation, examples, etc.
+
+    - name: Notify team
+      if: success()
+      run: |
+        echo "Successfully released version ${{ needs.determine-release-type.outputs.version }}"
+        # Add notification steps (Slack, Discord, email, etc.)
