@@ -6,7 +6,7 @@ This example demonstrates how to integrate Camino AI's location intelligence
 MCP server with LangChain to create a powerful location-aware AI agent.
 
 Requirements:
-- pip install langchain-mcp-adapters langgraph langchain-anthropic
+- pip install langchain-mcp-adapters langgraph langchain-anthropic dotenv
 - Camino AI API key from https://app.getcamino.ai
 - Anthropic API key
 
