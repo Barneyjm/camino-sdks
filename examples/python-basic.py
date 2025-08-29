@@ -39,7 +39,15 @@ async def main():
     print("=" * 40)
 
     # Example 1: Basic Query
-    print("\n1️⃣ Basic Query Example")
+    print("\n1️⃣ Basic Search Example")
+    try:
+        response = await client.search_async("eiffel tower")
+        print(f"✅ Found {len(response.results)} results")
+        for i, result in enumerate(response.results[:3]):  # Show first 3
+            print(f"   {i+1}. {result.display_name} - {result.lat}, {result.lon}")
+    except APIError as e:
+        print(f"❌ Query failed: {e.message}")
+
     try:
         response = await client.query_async("coffee shops in Manhattan")
         print(f"✅ Found {response.total} coffee shops")

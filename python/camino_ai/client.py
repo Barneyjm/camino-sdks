@@ -8,6 +8,8 @@ from httpx import AsyncClient, Client, Response
 from .models import (
     QueryRequest,
     QueryResponse,
+    SearchRequest,
+    SearchResponse,
     RelationshipRequest,
     RelationshipResponse,
     ContextRequest,
@@ -146,7 +148,7 @@ class CaminoAI:
     # Query methods
     def query(self, query: Union[str, QueryRequest]) -> QueryResponse:
         """
-        Search for points of interest using natural language.
+        Broad area-based query for points of interest using natural language.
 
         Args:
             query: Natural language query string or QueryRequest object
@@ -155,7 +157,7 @@ class CaminoAI:
             QueryResponse with search results
         """
         if isinstance(query, str):
-            query = QueryRequest(q=query)
+            query = QueryRequest(query=query)
 
         data = self._make_request(
             "GET", "/query", params=query.model_dump(exclude_none=True))
@@ -168,6 +170,35 @@ class CaminoAI:
 
         data = await self._make_async_request("GET", "/query", params=query.model_dump(exclude_none=True))
         return QueryResponse.model_validate(data)
+
+    # Search methods
+    def search(self, query: Union[str, SearchRequest]) -> SearchResponse:
+        """
+        Search for a specific place by name using Nominatim.
+
+        Uses Nominatim to search for specific, named places like 'Hotel Principe di Savoia Milan'.
+        Best for non-categorical searches.
+
+        Args:
+            query: Search query string or SearchRequest object
+
+        Returns:
+            SearchResponse with search results
+        """
+        if isinstance(query, str):
+            query = SearchRequest(query=query)
+
+        data = self._make_request(
+            "POST", "/search", params=query.model_dump(exclude_none=True))
+        return SearchResponse.model_validate({"results": data})
+
+    async def search_async(self, query: Union[str, SearchRequest]) -> SearchResponse:
+        """Async version of search method."""
+        if isinstance(query, str):
+            query = SearchRequest(query=query)
+
+        data = await self._make_async_request("POST", "/search", params=query.model_dump(exclude_none=True))
+        return SearchResponse.model_validate({"results": data})
 
     # Relationship methods
     def relationship(self, request: RelationshipRequest) -> RelationshipResponse:

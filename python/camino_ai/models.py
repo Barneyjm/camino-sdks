@@ -293,6 +293,32 @@ class RouteResponse(BaseModel):
                                    description="Whether geometry was included")
 
 
+class SearchRequest(BaseModel):
+    """Request model for specific place searches using Nominatim."""
+
+    query: str = Field(..., description="The search query, e.g., 'Eiffel Tower' or 'Starbucks Times Square'")
+
+
+class SearchResult(BaseModel):
+    """Individual search result from Nominatim."""
+
+    display_name: str = Field(...,
+                              description="Full display name of the location")
+    lat: float = Field(..., description="Latitude of the location")
+    lon: float = Field(..., description="Longitude of the location")
+    type: str = Field(..., description="Type/category of the location")
+    importance: float = Field(...,
+                              description="Importance score of the result")
+    source: str = Field(default="nominatim", description="Data source")
+
+
+class SearchResponse(BaseModel):
+    """Response model for search results."""
+
+    results: List[SearchResult] = Field(...,
+                                        description="List of search results")
+
+
 # Exception classes
 class CaminoError(Exception):
     """Base exception for Camino AI SDK."""
