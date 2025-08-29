@@ -19,10 +19,10 @@ Camino AI provides location intelligence and spatial reasoning capabilities for 
 
 ## 📦 Available SDKs
 
-| Language | Package | Documentation | Version |
-|----------|---------|---------------|---------|
-| **Python** | [`camino-ai-sdk`](https://pypi.org/project/camino-ai-sdk/) | [Python Docs](python/README.md) | ![PyPI](https://img.shields.io/pypi/v/camino-ai-sdk.svg) |
-| **JavaScript/TypeScript** | [`@camino-ai/sdk`](https://www.npmjs.com/package/@camino-ai/sdk) | [JS/TS Docs](javascript/README.md) | ![npm](https://img.shields.io/npm/v/@camino-ai/sdk.svg) |
+| Language                  | Package                                                          | Documentation                      | Version                                                  |
+| ------------------------- | ---------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------- |
+| **Python**                | [`camino-ai-sdk`](https://pypi.org/project/camino-ai-sdk/)       | [Python Docs](python/README.md)    | ![PyPI](https://img.shields.io/pypi/v/camino-ai-sdk.svg) |
+| **JavaScript/TypeScript** | [`@camino-ai/sdk`](https://www.npmjs.com/package/@camino-ai/sdk) | [JS/TS Docs](javascript/README.md) | ![npm](https://img.shields.io/npm/v/@camino-ai/sdk.svg)  |
 
 ## 🚀 Quick Start
 
@@ -146,12 +146,12 @@ const journey = await client.journey({
 
 ## 🛠️ Examples
 
-| Example | Python | JavaScript | TypeScript |
-|---------|--------|------------|------------|
-| **Basic Usage** | [python-basic.py](examples/python-basic.py) | [javascript-basic.js](examples/javascript-basic.js) | - |
-| **Advanced Patterns** | - | - | [typescript-advanced.ts](examples/typescript-advanced.ts) |
-| **Error Handling** | ✅ Included | ✅ Included | ✅ Included |
-| **Async/Await** | ✅ Included | ✅ Included | ✅ Included |
+| Example               | Python                                      | JavaScript                                          | TypeScript                                                |
+| --------------------- | ------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| **Basic Usage**       | [python-basic.py](examples/python-basic.py) | [javascript-basic.js](examples/javascript-basic.js) | -                                                         |
+| **Advanced Patterns** | -                                           | -                                                   | [typescript-advanced.ts](examples/typescript-advanced.ts) |
+| **Error Handling**    | ✅ Included                                  | ✅ Included                                          | ✅ Included                                                |
+| **Async/Await**       | ✅ Included                                  | ✅ Included                                          | ✅ Included                                                |
 
 ## 🔧 Development
 
@@ -209,17 +209,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔗 Links
 
 - **Website**: [getcamino.ai](https://getcamino.ai)
-- **API Documentation**: [docs.getcamino.ai](https://docs.getcamino.ai)  
+- **API Documentation**: [api.getcamino.ai](https://api.getcamino.ai/docs)  
 - **Dashboard**: [app.getcamino.ai](https://app.getcamino.ai)
-- **Status Page**: [status.getcamino.ai](https://status.getcamino.ai)
 
 ---
 
 <div align="center">
   <p>Built with ❤️ by the <a href="https://getcamino.ai">Camino AI</a> team</p>
   <p>
-    <a href="https://twitter.com/getcamino">Twitter</a> •
-    <a href="https://github.com/camino-ai">GitHub</a> •
     <a href="https://linkedin.com/company/camino-ai">LinkedIn</a>
   </p>
 </div>

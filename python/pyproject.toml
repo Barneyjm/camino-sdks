@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "camino-ai-sdk"
-version = "0.2.0"
+version = "0.3.0"
 description = "Camino AI Python SDK for location intelligence and spatial reasoning"
 authors = ["Camino AI <support@getcamino.ai>"]
 license = "MIT"
