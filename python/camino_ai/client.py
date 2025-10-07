@@ -1,26 +1,27 @@
 """Main client class for the Camino AI SDK."""
 
 import asyncio
-from typing import Dict, List, Optional, Union
+from typing import Any, Optional, Union
+
 import httpx
 from httpx import AsyncClient, Client, Response
 
 from .models import (
-    QueryRequest,
-    QueryResponse,
-    SearchRequest,
-    SearchResponse,
-    RelationshipRequest,
-    RelationshipResponse,
+    APIError,
+    AuthenticationError,
     ContextRequest,
     ContextResponse,
     JourneyRequest,
     JourneyResponse,
+    QueryRequest,
+    QueryResponse,
+    RateLimitError,
+    RelationshipRequest,
+    RelationshipResponse,
     RouteRequest,
     RouteResponse,
-    APIError,
-    AuthenticationError,
-    RateLimitError,
+    SearchRequest,
+    SearchResponse,
 )
 
 
@@ -87,7 +88,7 @@ class CaminoAI:
             )
         return self._async_client
 
-    def _handle_response(self, response: Response) -> Dict:
+    def _handle_response(self, response: Response) -> dict[str, Any]:
         """Handle HTTP response and raise appropriate exceptions."""
         try:
             response.raise_for_status()
@@ -102,17 +103,17 @@ class CaminoAI:
                 message = str(e)
 
             if status_code == 401:
-                raise AuthenticationError(message, status_code, error_data)
+                raise AuthenticationError(message, status_code, error_data) from e
             elif status_code == 429:
                 retry_after = e.response.headers.get("Retry-After")
                 retry_seconds = int(retry_after) if retry_after else None
-                raise RateLimitError(message, retry_seconds)
+                raise RateLimitError(message, retry_seconds) from e
             else:
-                raise APIError(message, status_code, error_data)
+                raise APIError(message, status_code, error_data) from e
         except httpx.RequestError as e:
-            raise APIError(f"Request failed: {str(e)}")
+            raise APIError(f"Request failed: {str(e)}") from e
 
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict:
+    def _make_request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:  # type: ignore[misc,return]
         """Make synchronous HTTP request with retries."""
         url = f"{self.base_url}{endpoint}"
 
@@ -123,13 +124,15 @@ class CaminoAI:
             except (httpx.RequestError, httpx.TimeoutException) as e:
                 if attempt == self.max_retries:
                     raise APIError(
-                        f"Request failed after {self.max_retries + 1} attempts: {str(e)}")
+                        f"Request failed after {self.max_retries + 1} attempts: {str(e)}"
+                    ) from e
 
                 # Exponential backoff
                 import time
-                time.sleep(self.retry_backoff * (2 ** attempt))
 
-    async def _make_async_request(self, method: str, endpoint: str, **kwargs) -> Dict:
+                time.sleep(self.retry_backoff * (2**attempt))
+
+    async def _make_async_request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:  # type: ignore[misc,return]
         """Make asynchronous HTTP request with retries."""
         url = f"{self.base_url}{endpoint}"
 
@@ -140,10 +143,11 @@ class CaminoAI:
             except (httpx.RequestError, httpx.TimeoutException) as e:
                 if attempt == self.max_retries:
                     raise APIError(
-                        f"Request failed after {self.max_retries + 1} attempts: {str(e)}")
+                        f"Request failed after {self.max_retries + 1} attempts: {str(e)}"
+                    ) from e
 
                 # Exponential backoff
-                await asyncio.sleep(self.retry_backoff * (2 ** attempt))
+                await asyncio.sleep(self.retry_backoff * (2**attempt))
 
     # Query methods
     def query(self, query: Union[str, QueryRequest]) -> QueryResponse:
@@ -157,18 +161,21 @@ class CaminoAI:
             QueryResponse with search results
         """
         if isinstance(query, str):
-            query = QueryRequest(query=query)
+            query = QueryRequest(query=query)  # type: ignore[call-arg]
 
         data = self._make_request(
-            "GET", "/query", params=query.model_dump(exclude_none=True))
+            "GET", "/query", params=query.model_dump(exclude_none=True)
+        )
         return QueryResponse.model_validate(data)
 
     async def query_async(self, query: Union[str, QueryRequest]) -> QueryResponse:
         """Async version of query method."""
         if isinstance(query, str):
-            query = QueryRequest(query=query)
+            query = QueryRequest(query=query)  # type: ignore[call-arg]
 
-        data = await self._make_async_request("GET", "/query", params=query.model_dump(exclude_none=True))
+        data = await self._make_async_request(
+            "GET", "/query", params=query.model_dump(exclude_none=True)
+        )
         return QueryResponse.model_validate(data)
 
     # Search methods
@@ -207,10 +214,11 @@ class CaminoAI:
             SearchResponse with search results including address details
         """
         if isinstance(query, str):
-            query = SearchRequest(query=query)
+            query = SearchRequest(query=query)  # type: ignore[call-arg]
 
         data = self._make_request(
-            "POST", "/search", params=query.model_dump(exclude_none=True))
+            "POST", "/search", params=query.model_dump(exclude_none=True)
+        )
         return SearchResponse.model_validate({"results": data})
 
     async def search_async(self, query: Union[str, SearchRequest]) -> SearchResponse:
@@ -226,9 +234,11 @@ class CaminoAI:
             SearchResponse with search results including address details
         """
         if isinstance(query, str):
-            query = SearchRequest(query=query)
+            query = SearchRequest(query=query)  # type: ignore[call-arg]
 
-        data = await self._make_async_request("POST", "/search", params=query.model_dump(exclude_none=True))
+        data = await self._make_async_request(
+            "POST", "/search", params=query.model_dump(exclude_none=True)
+        )
         return SearchResponse.model_validate({"results": data})
 
     # Relationship methods
@@ -243,12 +253,17 @@ class CaminoAI:
             RelationshipResponse with spatial relationship info
         """
         data = self._make_request(
-            "POST", "/relationship", json=request.model_dump(exclude_none=True))
+            "POST", "/relationship", json=request.model_dump(exclude_none=True)
+        )
         return RelationshipResponse.model_validate(data)
 
-    async def relationship_async(self, request: RelationshipRequest) -> RelationshipResponse:
+    async def relationship_async(
+        self, request: RelationshipRequest
+    ) -> RelationshipResponse:
         """Async version of relationship method."""
-        data = await self._make_async_request("POST", "/relationship", json=request.model_dump(exclude_none=True))
+        data = await self._make_async_request(
+            "POST", "/relationship", json=request.model_dump(exclude_none=True)
+        )
         return RelationshipResponse.model_validate(data)
 
     # Context methods
@@ -263,12 +278,15 @@ class CaminoAI:
             ContextResponse with location context
         """
         data = self._make_request(
-            "POST", "/context", json=request.model_dump(exclude_none=True))
+            "POST", "/context", json=request.model_dump(exclude_none=True)
+        )
         return ContextResponse.model_validate(data)
 
     async def context_async(self, request: ContextRequest) -> ContextResponse:
         """Async version of context method."""
-        data = await self._make_async_request("POST", "/context", json=request.model_dump(exclude_none=True))
+        data = await self._make_async_request(
+            "POST", "/context", json=request.model_dump(exclude_none=True)
+        )
         return ContextResponse.model_validate(data)
 
     # Journey methods
@@ -283,12 +301,15 @@ class CaminoAI:
             JourneyResponse with optimized journey plan
         """
         data = self._make_request(
-            "POST", "/journey", json=request.model_dump(exclude_none=True))
+            "POST", "/journey", json=request.model_dump(exclude_none=True)
+        )
         return JourneyResponse.model_validate(data)
 
     async def journey_async(self, request: JourneyRequest) -> JourneyResponse:
         """Async version of journey method."""
-        data = await self._make_async_request("POST", "/journey", json=request.model_dump(exclude_none=True))
+        data = await self._make_async_request(
+            "POST", "/journey", json=request.model_dump(exclude_none=True)
+        )
         return JourneyResponse.model_validate(data)
 
     # Route methods
@@ -303,12 +324,15 @@ class CaminoAI:
             RouteResponse with route information
         """
         data = self._make_request(
-            "GET", "/route", params=request.model_dump(exclude_none=True))
+            "GET", "/route", params=request.model_dump(exclude_none=True)
+        )
         return RouteResponse.model_validate(data)
 
     async def route_async(self, request: RouteRequest) -> RouteResponse:
         """Async version of route method."""
-        data = await self._make_async_request("GET", "/route", params=request.model_dump(exclude_none=True))
+        data = await self._make_async_request(
+            "GET", "/route", params=request.model_dump(exclude_none=True)
+        )
         return RouteResponse.model_validate(data)
 
     def close(self) -> None:
@@ -321,18 +345,18 @@ class CaminoAI:
         if self._async_client:
             await self._async_client.aclose()
 
-    def __enter__(self):
+    def __enter__(self) -> "CaminoAI":
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore[no-untyped-def]
         """Context manager exit."""
         self.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "CaminoAI":
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore[no-untyped-def]
         """Async context manager exit."""
         await self.aclose()

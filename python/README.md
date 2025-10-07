@@ -362,7 +362,10 @@ poetry run black camino_ai tests
 poetry run isort camino_ai tests
 
 # Lint code
-poetry run flake8 camino_ai tests
+poetry run ruff check camino_ai tests
+
+# Auto-fix linting issues
+poetry run ruff check --fix camino_ai tests
 ```
 
 ## License

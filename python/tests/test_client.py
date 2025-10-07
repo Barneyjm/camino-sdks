@@ -1,28 +1,21 @@
 """Tests for the Camino AI Python client."""
 
+
 import pytest
-from unittest.mock import Mock, patch
-import httpx
-from httpx import Response
 from pytest_httpx import HTTPXMock
 
 from camino_ai import CaminoAI
 from camino_ai.models import (
-    QueryRequest,
-    QueryResponse,
-    QueryResult,
-    RelationshipRequest,
-    RelationshipResponse,
-    ContextRequest,
-    ContextResponse,
-    JourneyRequest,
-    JourneyResponse,
-    RouteRequest,
-    RouteResponse,
-    Coordinate,
     APIError,
     AuthenticationError,
+    ContextRequest,
+    ContextResponse,
+    Coordinate,
+    QueryRequest,
+    QueryResponse,
     RateLimitError,
+    RelationshipRequest,
+    RelationshipResponse,
 )
 
 
@@ -50,7 +43,7 @@ class TestCaminoAI:
             base_url="https://custom.api.com",
             timeout=60.0,
             max_retries=5,
-            retry_backoff=2.0
+            retry_backoff=2.0,
         )
         assert client.api_key == "test-key"
         assert client.base_url == "https://custom.api.com"
@@ -87,7 +80,7 @@ class TestQueryMethods:
                     "tags": {"name": "Central Perk", "amenity": "cafe"},
                     "name": "Central Perk",
                     "amenity": "cafe",
-                    "relevance_rank": 1
+                    "relevance_rank": 1,
                 }
             ],
             "ai_ranked": True,
@@ -96,14 +89,14 @@ class TestQueryMethods:
                 "limit": 20,
                 "offset": 0,
                 "returned_count": 1,
-                "has_more": False
-            }
+                "has_more": False,
+            },
         }
 
         httpx_mock.add_response(
             method="GET",
             url="https://api.getcamino.ai/query?query=coffee+shops&rank=true&limit=20&offset=0&answer=false&mode=basic",
-            json=mock_response
+            json=mock_response,
         )
 
         response = self.client.query("coffee shops")
@@ -124,22 +117,18 @@ class TestQueryMethods:
                 "limit": 10,
                 "offset": 0,
                 "returned_count": 0,
-                "has_more": False
-            }
+                "has_more": False,
+            },
         }
 
         httpx_mock.add_response(
             method="GET",
             url="https://api.getcamino.ai/query?query=coffee+shops&lat=40.7831&lon=-73.9712&radius=1000&rank=true&limit=10&offset=0&answer=false&mode=basic",
-            json=mock_response
+            json=mock_response,
         )
 
         request = QueryRequest(
-            query="coffee shops",
-            lat=40.7831,
-            lon=-73.9712,
-            radius=1000,
-            limit=10
+            query="coffee shops", lat=40.7831, lon=-73.9712, radius=1000, limit=10
         )
 
         response = self.client.query(request)
@@ -158,14 +147,14 @@ class TestQueryMethods:
                 "limit": 20,
                 "offset": 0,
                 "returned_count": 0,
-                "has_more": False
-            }
+                "has_more": False,
+            },
         }
 
         httpx_mock.add_response(
             method="GET",
             url="https://api.getcamino.ai/query?query=test+query&rank=true&limit=20&offset=0&answer=false&mode=basic",
-            json=mock_response
+            json=mock_response,
         )
 
         response = await self.client.query_async("test query")
@@ -188,18 +177,18 @@ class TestRelationshipMethods:
             "actual_distance_km": 1.235,
             "duration_seconds": 900,
             "driving_time": "5 minutes",
-            "description": "The location is 1.2 km southwest, approximately 15 minutes walking"
+            "description": "The location is 1.2 km southwest, approximately 15 minutes walking",
         }
 
         httpx_mock.add_response(
             method="POST",
             url="https://api.getcamino.ai/relationship",
-            json=mock_response
+            json=mock_response,
         )
 
         request = RelationshipRequest(
             start=Coordinate(lat=40.7831, lon=-73.9712),
-            end=Coordinate(lat=40.7589, lon=-73.9851)
+            end=Coordinate(lat=40.7589, lon=-73.9851),
         )
 
         response = self.client.relationship(request)
@@ -231,22 +220,19 @@ class TestContextMethods:
                 "shops": ["Zabar's", "Fairway Market"],
                 "attractions": ["Museum of Natural History"],
                 "leisure": ["Central Park"],
-                "offices": []
+                "offices": [],
             },
             "location": {"lat": 40.7831, "lon": -73.9712},
             "search_radius": 500,
-            "total_places_found": 47
+            "total_places_found": 47,
         }
 
         httpx_mock.add_response(
-            method="POST",
-            url="https://api.getcamino.ai/context",
-            json=mock_response
+            method="POST", url="https://api.getcamino.ai/context", json=mock_response
         )
 
         request = ContextRequest(
-            location=Coordinate(lat=40.7831, lon=-73.9712),
-            radius=500
+            location=Coordinate(lat=40.7831, lon=-73.9712), radius=500
         )
 
         response = self.client.context(request)
@@ -271,7 +257,7 @@ class TestErrorHandling:
             method="GET",
             url="https://api.getcamino.ai/query?query=test&rank=true&limit=20&offset=0&answer=false&mode=basic",
             status_code=401,
-            json={"message": "Invalid API key"}
+            json={"message": "Invalid API key"},
         )
 
         with pytest.raises(AuthenticationError) as exc_info:
@@ -287,7 +273,7 @@ class TestErrorHandling:
             url="https://api.getcamino.ai/query?query=test&rank=true&limit=20&offset=0&answer=false&mode=basic",
             status_code=429,
             headers={"Retry-After": "60"},
-            json={"message": "Rate limit exceeded"}
+            json={"message": "Rate limit exceeded"},
         )
 
         with pytest.raises(RateLimitError) as exc_info:
@@ -302,7 +288,7 @@ class TestErrorHandling:
             method="GET",
             url="https://api.getcamino.ai/query?query=test&rank=true&limit=20&offset=0&answer=false&mode=basic",
             status_code=500,
-            json={"message": "Internal server error"}
+            json={"message": "Internal server error"},
         )
 
         with pytest.raises(APIError) as exc_info:

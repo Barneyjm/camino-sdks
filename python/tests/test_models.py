@@ -4,28 +4,20 @@ import pytest
 from pydantic import ValidationError
 
 from camino_ai.models import (
+    APIError,
+    AuthenticationError,
+    CaminoError,
     Coordinate,
+    JourneyRequest,
     QueryRequest,
     QueryResponse,
     QueryResult,
+    RateLimitError,
     RelationshipRequest,
     RelationshipResponse,
-    RouteSegmentInfo,
-    RelationshipAnalysis,
-    LocationWithPurpose,
-    ContextRequest,
-    ContextResponse,
-    JourneyRequest,
-    JourneyResponse,
-    RouteRequest,
-    RouteResponse,
+    RouteSegment,
     TransportMode,
     Waypoint,
-    RouteSegment,
-    CaminoError,
-    APIError,
-    AuthenticationError,
-    RateLimitError,
 )
 
 
@@ -86,11 +78,7 @@ class TestQueryModels:
     def test_query_request_full(self):
         """Test full QueryRequest with all fields."""
         request = QueryRequest(
-            query="coffee shops",
-            lat=40.7831,
-            lon=-73.9712,
-            radius=1000,
-            limit=10
+            query="coffee shops", lat=40.7831, lon=-73.9712, radius=1000, limit=10
         )
         assert request.query == "coffee shops"
         assert request.lat == 40.7831
@@ -107,7 +95,7 @@ class TestQueryModels:
             tags={"name": "Central Perk", "phone": "555-1234"},
             name="Central Perk",
             amenity="cafe",
-            relevance_rank=1
+            relevance_rank=1,
         )
         assert result.name == "Central Perk"
         assert result.location.lat == 40.7831
@@ -123,7 +111,7 @@ class TestQueryModels:
             location=Coordinate(lat=40.7831, lon=-73.9712),
             tags={"name": "Test Place"},
             name="Test Place",
-            relevance_rank=1
+            relevance_rank=1,
         )
         response = QueryResponse(
             query="test query",
@@ -134,8 +122,8 @@ class TestQueryModels:
                 "limit": 20,
                 "offset": 0,
                 "returned_count": 1,
-                "has_more": False
-            }
+                "has_more": False,
+            },
         )
         assert len(response.results) == 1
         assert response.pagination.total_results == 1
@@ -149,11 +137,7 @@ class TestRelationshipModels:
         """Test RelationshipRequest model."""
         from_loc = Coordinate(lat=40.7831, lon=-73.9712)
         to_loc = Coordinate(lat=40.7589, lon=-73.9851)
-        request = RelationshipRequest(
-            start=from_loc,
-            end=to_loc,
-            include=["distance"]
-        )
+        request = RelationshipRequest(start=from_loc, end=to_loc, include=["distance"])
         assert request.start == from_loc
         assert request.end == to_loc
         assert request.include == ["distance"]
@@ -167,7 +151,7 @@ class TestRelationshipModels:
             actual_distance_km=1.235,
             duration_seconds=900,
             driving_time="5 minutes",
-            description="1.2 km northeast"
+            description="1.2 km northeast",
         )
         assert response.distance == "1.2 km"
         assert response.direction == "northeast"
@@ -181,11 +165,7 @@ class TestJourneyModels:
 
     def test_waypoint_with_coordinate(self):
         """Test Waypoint with coordinate location."""
-        waypoint = Waypoint(
-            lat=40.7831,
-            lon=-73.9712,
-            purpose="Central Park"
-        )
+        waypoint = Waypoint(lat=40.7831, lon=-73.9712, purpose="Central Park")
         assert waypoint.lat == 40.7831
         assert waypoint.lon == -73.9712
         assert waypoint.purpose == "Central Park"
@@ -203,7 +183,7 @@ class TestJourneyModels:
             "transport_mode": TransportMode.DRIVING,
             "max_duration": 120,
             "avoid_tolls": True,
-            "avoid_highways": False
+            "avoid_highways": False,
         }
         assert constraints["transport_mode"] == TransportMode.DRIVING
         assert constraints["max_duration"] == 120
@@ -214,13 +194,10 @@ class TestJourneyModels:
         """Test JourneyRequest model."""
         waypoints = [
             Waypoint(lat=40.7831, lon=-73.9712, purpose="Start"),
-            Waypoint(lat=40.7589, lon=-73.9851, purpose="End")
+            Waypoint(lat=40.7589, lon=-73.9851, purpose="End"),
         ]
         constraints = {"transport_mode": TransportMode.WALKING}
-        request = JourneyRequest(
-            waypoints=waypoints,
-            constraints=constraints
-        )
+        request = JourneyRequest(waypoints=waypoints, constraints=constraints)
         assert len(request.waypoints) == 2
         assert request.constraints == constraints
 
@@ -233,7 +210,7 @@ class TestJourneyModels:
             end=end,
             distance=1234.56,
             duration=300.0,
-            instructions="Turn left on Broadway"
+            instructions="Turn left on Broadway",
         )
         assert segment.start == start
         assert segment.end == end
@@ -292,7 +269,7 @@ class TestModelSerialization:
         # Should only include non-None values and defaults
         assert data["query"] == "test"
         assert "lat" not in data or data.get("lat") is None
-        assert data.get("rank") == True  # default value
+        assert data.get("rank") is True  # default value
         assert data.get("mode") == "basic"  # default value
 
     def test_include_none_serialization(self):
@@ -304,7 +281,7 @@ class TestModelSerialization:
         assert data["lat"] is None
         assert data["lon"] is None
         assert data["radius"] is None
-        assert data["rank"] == True
+        assert data["rank"] is True
         assert data["limit"] == 20
         assert data["mode"] == "basic"
 
@@ -319,7 +296,7 @@ class TestModelSerialization:
                     "location": {"lat": 40.7831, "lon": -73.9712},
                     "tags": {"name": "Test Place"},
                     "name": "Test Place",
-                    "relevance_rank": 1
+                    "relevance_rank": 1,
                 }
             ],
             "ai_ranked": True,
@@ -328,8 +305,8 @@ class TestModelSerialization:
                 "limit": 20,
                 "offset": 0,
                 "returned_count": 1,
-                "has_more": False
-            }
+                "has_more": False,
+            },
         }
         response = QueryResponse.model_validate(data)
         assert len(response.results) == 1
