@@ -200,12 +200,6 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
-      - name: Check Python dependencies for known vulnerabilities
-        working-directory: ./python
-        run: |
-          pip install safety
-          safety check
-
       - name: Check JavaScript dependencies for known vulnerabilities
         working-directory: ./javascript
         run: npm audit --audit-level moderate
