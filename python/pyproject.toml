@@ -39,6 +39,7 @@ python = "^3.9"
 httpx = "^0.28.0"
 pydantic = "^2.0.0"
 typing-extensions = "^4.5.0"
+eval-type-backport = {version = "^0.2.0", python = "<3.10"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
