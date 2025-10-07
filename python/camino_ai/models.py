@@ -1,8 +1,9 @@
 """Data models for the Camino AI SDK."""
 
+from __future__ import annotations
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Coordinate(BaseModel):
@@ -29,9 +30,17 @@ class TransportMode(str, Enum):
 
 
 class QueryRequest(BaseModel):
-    """Request model for natural language location queries."""
+    """Request model for natural language location queries.
 
-    query: str = Field(...,
+    Supports temporal queries to search historical OpenStreetMap data:
+    - Point in time: time="2020-01-01"
+    - Changes since: time="2020.."
+    - Changes between: time="2020..2024"
+
+    Either 'query' or 'osm_ids' must be provided.
+    """
+
+    query: Optional[str] = Field(None,
                        description="Natural language query, e.g., 'coffee near me'")
     lat: Optional[float] = Field(
         None, description="Latitude for the center of your search")
@@ -47,6 +56,19 @@ class QueryRequest(BaseModel):
         0, description="Number of results to skip for pagination (default: 0)", ge=0)
     answer: Optional[bool] = Field(
         False, description="Generate a human-readable answer summary (default: false)")
+    time: Optional[str] = Field(
+        None, description="Time parameter for temporal queries: '2020-01-01' (point), '2020..' (since), '2020..2024' (range)")
+    osm_ids: Optional[str] = Field(
+        None, description="Comma-separated OSM IDs to query specific elements (e.g., 'node/123,way/456')")
+    mode: Optional[str] = Field(
+        "basic", description="Query mode: 'basic' (open data only) or 'advanced' (web enrichment, AWS fallback)")
+
+    @model_validator(mode='after')
+    def validate_query_or_osm_ids(self):
+        """Ensure that either query or osm_ids is provided."""
+        if not self.query and not self.osm_ids:
+            raise ValueError("Either 'query' or 'osm_ids' must be provided")
+        return self
 
 
 class QueryResult(BaseModel):
@@ -61,6 +83,12 @@ class QueryResult(BaseModel):
     cuisine: Optional[str] = Field(
         None, description="Cuisine type if applicable")
     relevance_rank: int = Field(..., description="AI relevance ranking")
+
+    # Web enrichment field (optional, added when TAVILY_API_KEY is configured)
+    web_enrichment: Optional[WebEnrichment] = Field(
+        None,
+        description="Web verification and operational status signals from authoritative sources"
+    )
 
     @property
     def coordinate(self) -> Coordinate:
@@ -121,6 +149,10 @@ class QueryResponse(BaseModel):
     pagination: Pagination = Field(..., description="Pagination information")
     answer: Optional[str] = Field(
         None, description="AI-generated answer summary")
+    historical_context: Optional[str] = Field(
+        None, description="Human-readable temporal context (e.g., 'as of January 1, 2020', 'changes since March 2020')")
+    diff_analysis: Optional['DiffAnalysis'] = Field(
+        None, description="Analysis of changes for temporal diff queries")
 
     @property
     def total(self) -> int:
@@ -182,7 +214,13 @@ class RelationshipResponse(BaseModel):
 
 
 class ContextRequest(BaseModel):
-    """Request model for location context."""
+    """Request model for location context.
+
+    Supports temporal queries to analyze how areas have changed over time:
+    - Point in time: time="2020-01-01"
+    - Changes since: time="2020.."
+    - Changes between: time="2018..2024"
+    """
 
     location: Coordinate = Field(...,
                                  description="Location to get context for")
@@ -192,15 +230,44 @@ class ContextRequest(BaseModel):
         None, description="Context description for what to find")
     categories: Optional[List[str]] = Field(
         None, description="Specific categories to include")
+    time: Optional[str] = Field(
+        None, description="Time parameter for temporal queries: '2020-01-01' (point), '2020..' (since), '2020..2024' (range)")
+
+
+class DiffAnalysis(BaseModel):
+    """Analysis of changes for temporal diff queries."""
+
+    added: List[Dict[str, Any]] = Field(..., description="Places added during time period")
+    removed: List[Dict[str, Any]] = Field(..., description="Places removed during time period")
+    modified: List[Dict[str, Any]] = Field(..., description="Places modified during time period")
+    summary: str = Field(..., description="Summary of changes")
+    total_changes: int = Field(..., description="Total number of changes detected")
+
+
+class TemporalAnalysis(BaseModel):
+    """Analysis of area changes over time for context queries."""
+
+    summary: str = Field(..., description="Summary of area evolution")
+    total_changes: int = Field(..., description="Total number of changes")
+    changes_breakdown: Dict[str, int] = Field(..., description="Breakdown of changes by type")
+    category_trends: Dict[str, Dict[str, int]] = Field(..., description="Changes by category")
+    trends: List[str] = Field(..., description="Major trends identified")
+    notable_changes: List[str] = Field(..., description="Notable changes in the area")
+    character_change: Optional[str] = Field(None, description="How the area character has changed")
+    detailed_changes: Dict[str, List[Dict[str, Any]]] = Field(..., description="Detailed list of changes")
 
 
 class RelevantPlaces(BaseModel):
     """Categorized relevant places in the context area."""
 
-    restaurants: List[str] = Field(..., description="Restaurant names")
-    services: List[str] = Field(..., description="Service establishment names")
-    shops: List[str] = Field(..., description="Shop names")
-    attractions: List[str] = Field(..., description="Attraction names")
+    restaurants: Optional[List[str]] = Field(default=[], description="Restaurant names")
+    hotels: Optional[List[str]] = Field(default=[], description="Hotel names")
+    services: Optional[List[str]] = Field(default=[], description="Service establishment names")
+    transportation: Optional[List[str]] = Field(default=[], description="Transportation options")
+    shops: Optional[List[str]] = Field(default=[], description="Shop names")
+    attractions: Optional[List[str]] = Field(default=[], description="Attraction names")
+    leisure: Optional[List[str]] = Field(default=[], description="Leisure facilities")
+    offices: Optional[List[str]] = Field(default=[], description="Office buildings")
 
 
 class ContextResponse(BaseModel):
@@ -213,6 +280,12 @@ class ContextResponse(BaseModel):
     search_radius: int = Field(..., description="Search radius used in meters")
     total_places_found: int = Field(...,
                                     description="Total number of places found")
+    context_insights: Optional[str] = Field(
+        None, description="Context-specific insights based on the provided context")
+    historical_context: Optional[str] = Field(
+        None, description="Human-readable temporal context (e.g., 'as of January 1, 2020', 'changes since March 2020')")
+    temporal_analysis: Optional['TemporalAnalysis'] = Field(
+        None, description="Analysis of area changes over time for temporal queries")
 
 
 class Waypoint(BaseModel):
@@ -293,10 +366,84 @@ class RouteResponse(BaseModel):
                                    description="Whether geometry was included")
 
 
-class SearchRequest(BaseModel):
-    """Request model for specific place searches using Nominatim."""
+class WebEnrichment(BaseModel):
+    """Web verification data for a place - focuses on validation not extraction.
 
-    query: str = Field(..., description="The search query, e.g., 'Eiffel Tower' or 'Starbucks Times Square'")
+    Provides signals about a place's web presence and operational status
+    by checking authoritative sources like Yelp, TripAdvisor, etc.
+    """
+
+    web_verified: bool = Field(False, description="Whether the place was found on the web")
+    verification_sources: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of web sources that mention this place (domain, title, score)"
+    )
+    recent_mentions: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Recent web mentions with snippets (snippet, url, score)"
+    )
+    appears_operational: Optional[bool] = Field(
+        None,
+        description="Operational status: True=likely open, False=likely closed, None=unknown"
+    )
+    confidence: str = Field(
+        "low",
+        description="Confidence level of operational status: low, medium, high"
+    )
+
+
+class SearchRequest(BaseModel):
+    """Request model for place searches using Nominatim.
+
+    Supports two modes:
+    1. Free-form search: Use the 'query' parameter for natural language searches
+    2. Structured search: Use address components for precise location searches
+
+    Note: Cannot combine 'query' with structured parameters.
+    """
+
+    # Free-form search parameter
+    query: Optional[str] = Field(None,
+        description="Free-form search query (e.g., 'Eiffel Tower'). Cannot be combined with structured parameters.")
+
+    # Structured address parameters
+    amenity: Optional[str] = Field(None,
+        description="Name and/or type of POI (e.g., 'restaurant', 'Starbucks')")
+    street: Optional[str] = Field(None,
+        description="Street name with optional housenumber (e.g., '123 Main Street')")
+    city: Optional[str] = Field(None,
+        description="City name (e.g., 'Paris', 'New York')")
+    county: Optional[str] = Field(None,
+        description="County name")
+    state: Optional[str] = Field(None,
+        description="State or province name (e.g., 'California', 'Ontario')")
+    country: Optional[str] = Field(None,
+        description="Country name (e.g., 'France', 'United States')")
+    postalcode: Optional[str] = Field(None,
+        description="Postal/ZIP code (e.g., '10001', '75001')")
+
+    # Common parameters
+    limit: Optional[int] = Field(10,
+        description="Maximum number of results to return (1-50, default: 10)", ge=1, le=50)
+    mode: Optional[str] = Field(
+        "basic", description="Search mode: 'basic' (open data only) or 'advanced' (web enrichment, AWS fallback)")
+
+    @model_validator(mode='after')
+    def validate_search_mode(self):
+        """Ensure proper usage of free-form vs structured search."""
+        structured_params = [
+            self.amenity, self.street, self.city,
+            self.county, self.state, self.country, self.postalcode
+        ]
+        has_structured = any(param is not None for param in structured_params)
+
+        if self.query and has_structured:
+            raise ValueError("Cannot combine 'query' with structured address parameters")
+
+        if not self.query and not has_structured:
+            raise ValueError("Must provide either 'query' or at least one structured address parameter")
+
+        return self
 
 
 class SearchResult(BaseModel):
@@ -310,6 +457,28 @@ class SearchResult(BaseModel):
     importance: float = Field(...,
                               description="Importance score of the result")
     source: str = Field(default="nominatim", description="Data source")
+    address: Optional[Dict[str, str]] = Field(None,
+                              description="Detailed address components (amenity, house_number, road, city, state, postcode, country, etc.)")
+
+    # Web enrichment fields (optional, added when TAVILY_API_KEY is configured)
+    web_enrichment: Optional[WebEnrichment] = Field(
+        None,
+        description="Web verification and operational status signals from authoritative sources"
+    )
+
+    # Street imagery fields (optional, added when include_photos=true)
+    street_photos: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="Street-level photos from OpenStreetCam if available"
+    )
+    visual_context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Visual context analysis from street imagery"
+    )
+    has_street_imagery: Optional[bool] = Field(
+        None,
+        description="Whether street-level imagery is available for this location"
+    )
 
 
 class SearchResponse(BaseModel):

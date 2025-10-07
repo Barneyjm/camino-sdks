@@ -5,6 +5,7 @@ The official Python SDK for [Camino AI](https://getcamino.ai) - Guide your AI ag
 ## Features
 
 - 🌍 **Natural Language Queries**: Search for places using natural language
+- 🌐 **Web Enrichment**: Real-time verification from Yelp, TripAdvisor, and other authoritative sources
 - 📍 **Spatial Relationships**: Calculate distances, bearings, and spatial relationships
 - 🗺️ **Location Context**: Get rich contextual information about any location
 - 🧭 **Journey Planning**: Multi-waypoint journey optimization
@@ -84,12 +85,92 @@ from camino_ai import QueryRequest, Coordinate
 
 request = QueryRequest(
     query="coffee shops",
-    location=Coordinate(lat=40.7831, lng=-73.9712),
+    lat=40.7831,
+    lon=-73.9712,
     radius=1000,  # meters
     limit=10
 )
 response = client.query(request)
+
+# Access web enrichment data (if available)
+for result in response.results:
+    print(f"{result.name}")
+
+    # Check web verification
+    if result.web_enrichment and result.web_enrichment.web_verified:
+        sources = [s['domain'] for s in result.web_enrichment.verification_sources]
+        print(f"  Found on: {', '.join(sources)}")
+
+        # Check operational status
+        if result.web_enrichment.appears_operational is True:
+            print(f"  ✅ Appears open (confidence: {result.web_enrichment.confidence})")
+        elif result.web_enrichment.appears_operational is False:
+            print(f"  ⚠️  May be closed (confidence: {result.web_enrichment.confidence})")
 ```
+
+#### Query Modes
+
+Control which features are enabled with the `mode` parameter:
+
+```python
+# Basic mode (default) - Open data only
+response = client.query(QueryRequest(
+    query="coffee shops in Paris",
+    lat=48.8566,
+    lon=2.3522,
+    mode="basic"  # No web enrichment, no AWS fallback
+))
+
+# Advanced mode - Additional data sources enabled
+response = client.query(QueryRequest(
+    query="coffee shops in Paris",
+    lat=48.8566,
+    lon=2.3522,
+    mode="advanced"  # Includes web enrichment + AWS Location fallback
+))
+```
+
+**Mode options:**
+- `mode="basic"` (default): OpenStreetMap data only (no additional data sources)
+- `mode="advanced"`: Additional paid data sources enabled:
+  - **Tavily web enrichment**: Real-time verification from authoritative sources (Yelp, TripAdvisor, etc.)
+  - **AWS Location Service fallback**: When OSM has no results, fall back to AWS for better coverage
+
+**Cost consideration:** Only use `mode="advanced"` when you need real-time web verification or improved coverage. Basic mode uses only open data and is suitable for most location queries.
+
+### Search
+
+Search for places using free-form or structured queries via Nominatim:
+
+```python
+from camino_ai import SearchRequest
+
+# Free-form search
+response = client.search("Eiffel Tower")
+
+# Structured search with address components
+response = client.search(SearchRequest(
+    amenity="restaurant",
+    city="Paris",
+    country="France",
+    limit=10,
+    mode="basic"  # or "advanced" for web enrichment
+))
+
+# Access results
+for result in response.results:
+    print(f"{result.display_name}")
+    print(f"  Location: {result.lat}, {result.lon}")
+    print(f"  Type: {result.type}")
+
+    # Check for web enrichment (only in advanced mode)
+    if result.web_enrichment and result.web_enrichment.web_verified:
+        print(f"  ✓ Web verified")
+```
+
+**Mode parameter**:
+- `mode="basic"` (default): Nominatim search with open data only
+- `mode="advanced"`: Includes web enrichment for search results
 
 ### Relationships
 
@@ -183,12 +264,64 @@ except APIError as e:
     print(f"API error: {e.message} (status: {e.status_code})")
 ```
 
+## Web Enrichment
+
+Web enrichment provides real-time verification from authoritative web sources like Yelp, TripAdvisor, and official websites. This feature is only available in **advanced mode** (`mode="advanced"`).
+
+### Features
+
+- **Web Verification**: Confirms the place exists on authoritative sources
+- **Operational Status**: Detects if a place appears open or closed based on recent web mentions
+- **Verification Sources**: Lists which websites mention the location
+- **Recent Mentions**: Provides snippets from recent web content
+
+### Usage
+
+```python
+# Enable web enrichment by using advanced mode
+response = client.query(QueryRequest(
+    query="coffee shops near me",
+    lat=40.7589,
+    lon=-73.9851,
+    mode="advanced"  # Required for web enrichment
+))
+
+result = response.results[0]
+
+if result.web_enrichment:
+    # Check if verified on the web
+    if result.web_enrichment.web_verified:
+        print("✓ Verified on the web")
+
+    # Get verification sources
+    for source in result.web_enrichment.verification_sources:
+        print(f"  - {source['domain']}: {source['title']}")
+
+    # Check operational status
+    if result.web_enrichment.appears_operational is True:
+        print(f"Likely OPEN (confidence: {result.web_enrichment.confidence})")
+    elif result.web_enrichment.appears_operational is False:
+        print(f"Likely CLOSED (confidence: {result.web_enrichment.confidence})")
+
+    # Read recent mentions
+    for mention in result.web_enrichment.recent_mentions:
+        print(f"  {mention['snippet']}")
+        print(f"  Source: {mention['url']}")
+```
+
+**Requirements**:
+- Must use `mode="advanced"` in your query
+- API must have `TAVILY_API_KEY` configured
+- The place must be found in web search results
+
+**Note**: Web enrichment incurs additional costs through Tavily. Use `mode="basic"` when web verification is not needed.
+
 ## Transport Modes
 
 Available transport modes for routing and journey planning:
 
 - `TransportMode.DRIVING` - Car/driving directions
-- `TransportMode.WALKING` - Walking directions  
+- `TransportMode.WALKING` - Walking directions
 - `TransportMode.CYCLING` - Bicycle directions
 - `TransportMode.TRANSIT` - Public transportation
 

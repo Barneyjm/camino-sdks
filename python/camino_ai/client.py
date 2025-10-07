@@ -174,16 +174,37 @@ class CaminoAI:
     # Search methods
     def search(self, query: Union[str, SearchRequest]) -> SearchResponse:
         """
-        Search for a specific place by name using Nominatim.
+        Search for places using Nominatim with flexible query options.
 
-        Uses Nominatim to search for specific, named places like 'Hotel Principe di Savoia Milan'.
-        Best for non-categorical searches.
+        Supports two modes:
+        1. Free-form search: Pass a string or SearchRequest with 'query' parameter
+        2. Structured search: Pass SearchRequest with address components
+
+        Examples:
+            # Free-form search (backward compatible)
+            client.search("Eiffel Tower")
+
+            # Structured search for restaurants in a city
+            client.search(SearchRequest(
+                amenity="restaurant",
+                city="Paris",
+                country="France",
+                limit=10
+            ))
+
+            # Search by specific address
+            client.search(SearchRequest(
+                street="123 Main Street",
+                city="New York",
+                state="New York"
+            ))
 
         Args:
-            query: Search query string or SearchRequest object
+            query: Search query string or SearchRequest object with either
+                   free-form query or structured address parameters
 
         Returns:
-            SearchResponse with search results
+            SearchResponse with search results including address details
         """
         if isinstance(query, str):
             query = SearchRequest(query=query)
@@ -193,7 +214,17 @@ class CaminoAI:
         return SearchResponse.model_validate({"results": data})
 
     async def search_async(self, query: Union[str, SearchRequest]) -> SearchResponse:
-        """Async version of search method."""
+        """
+        Async version of search method with flexible query options.
+
+        See search() method for detailed documentation and examples.
+
+        Args:
+            query: Search query string or SearchRequest object
+
+        Returns:
+            SearchResponse with search results including address details
+        """
         if isinstance(query, str):
             query = SearchRequest(query=query)
 
