@@ -4,14 +4,7 @@ import pytest
 from unittest.mock import Mock, patch
 import httpx
 from httpx import Response
-
-# Skip all client tests for now - they need to be updated for the new API structure
-pytestmark = pytest.mark.skip(reason="Client tests need updating for new API structure")
-
-try:
-    from pytest_httpx import HTTPXMock
-except ImportError:
-    HTTPXMock = None
+from pytest_httpx import HTTPXMock
 
 from camino_ai import CaminoAI
 from camino_ai.models import (
@@ -123,43 +116,61 @@ class TestQueryMethods:
     def test_query_with_request_object(self, httpx_mock: HTTPXMock):
         """Test query method with QueryRequest object."""
         mock_response = {
+            "query": "coffee shops",
             "results": [],
-            "total": 0
+            "ai_ranked": True,
+            "pagination": {
+                "total_results": 0,
+                "limit": 10,
+                "offset": 0,
+                "returned_count": 0,
+                "has_more": False
+            }
         }
 
         httpx_mock.add_response(
-            method="POST",
-            url="https://api.getcamino.ai/query",
+            method="GET",
+            url="https://api.getcamino.ai/query?query=coffee+shops&lat=40.7831&lon=-73.9712&radius=1000&rank=true&limit=10&offset=0&answer=false&mode=basic",
             json=mock_response
         )
 
         request = QueryRequest(
             query="coffee shops",
-            location=Coordinate(lat=40.7831, lon=-73.9712),
+            lat=40.7831,
+            lon=-73.9712,
             radius=1000,
             limit=10
         )
 
         response = self.client.query(request)
         assert isinstance(response, QueryResponse)
-        assert response.total == 0
+        assert response.pagination.total_results == 0
 
     @pytest.mark.asyncio
     async def test_query_async(self, httpx_mock: HTTPXMock):
         """Test async query method."""
         mock_response = {
+            "query": "test query",
             "results": [],
-            "total": 0
+            "ai_ranked": True,
+            "pagination": {
+                "total_results": 0,
+                "limit": 20,
+                "offset": 0,
+                "returned_count": 0,
+                "has_more": False
+            }
         }
 
         httpx_mock.add_response(
-            method="POST",
-            url="https://api.getcamino.ai/query",
+            method="GET",
+            url="https://api.getcamino.ai/query?query=test+query&rank=true&limit=20&offset=0&answer=false&mode=basic",
             json=mock_response
         )
 
         response = await self.client.query_async("test query")
         assert isinstance(response, QueryResponse)
+        assert response.pagination.total_results == 0
 
 
 class TestRelationshipMethods:
@@ -171,23 +182,13 @@ class TestRelationshipMethods:
     def test_relationship(self, httpx_mock: HTTPXMock):
         """Test relationship method."""
         mock_response = {
-            "feasible": True,
-            "total_distance_km": 1.235,
-            "total_time_minutes": 15,
-            "total_time_formatted": "15 minutes",
-            "transport_mode": "walking",
-            "route_segments": [
-                {
-                    "from": {"lat": 40.7831, "lon": -73.9712, "purpose": "Start"},
-                    "to": {"lat": 40.7589, "lon": -73.9851, "purpose": "End"},
-                    "distance_km": 1.235,
-                    "estimated_time": "15 minutes"
-                }
-            ],
-            "analysis": {
-                "summary": "Direct walking route",
-                "optimization_opportunities": []
-            }
+            "distance": "1.2 km",
+            "direction": "southwest",
+            "walking_time": "15 minutes",
+            "actual_distance_km": 1.235,
+            "duration_seconds": 900,
+            "driving_time": "5 minutes",
+            "description": "The location is 1.2 km southwest, approximately 15 minutes walking"
         }
 
         httpx_mock.add_response(
@@ -203,12 +204,13 @@ class TestRelationshipMethods:
 
         response = self.client.relationship(request)
         assert isinstance(response, RelationshipResponse)
-        assert response.feasible == True
-        assert response.total_distance_km == 1.235
-        assert response.total_time_minutes == 15
-        assert response.transport_mode == "walking"
-        assert len(response.route_segments) == 1
-        assert response.analysis.summary == "Direct walking route"
+        assert response.distance == "1.2 km"
+        assert response.direction == "southwest"
+        assert response.walking_time == "15 minutes"
+        assert response.actual_distance_km == 1.235
+        assert response.duration_seconds == 900
+        assert response.driving_time == "5 minutes"
+        assert "1.2 km southwest" in response.description
 
 
 class TestContextMethods:
@@ -220,9 +222,20 @@ class TestContextMethods:
     def test_context(self, httpx_mock: HTTPXMock):
         """Test context method."""
         mock_response = {
+            "area_description": "Upper West Side neighborhood in Manhattan, characterized by residential buildings and cultural institutions",
+            "relevant_places": {
+                "restaurants": ["The Smith", "Cafe Luxembourg"],
+                "hotels": ["The Beacon Hotel"],
+                "services": ["UPS Store", "CVS Pharmacy"],
+                "transportation": ["72nd Street Subway Station"],
+                "shops": ["Zabar's", "Fairway Market"],
+                "attractions": ["Museum of Natural History"],
+                "leisure": ["Central Park"],
+                "offices": []
+            },
             "location": {"lat": 40.7831, "lon": -73.9712},
-            "context": {"area": "Manhattan", "neighborhood": "Upper West Side"},
-            "nearby": []
+            "search_radius": 500,
+            "total_places_found": 47
         }
 
         httpx_mock.add_response(
@@ -240,6 +253,10 @@ class TestContextMethods:
         assert isinstance(response, ContextResponse)
         assert response.location.lat == 40.7831
         assert response.location.lon == -73.9712
+        assert response.search_radius == 500
+        assert response.total_places_found == 47
+        assert "Upper West Side" in response.area_description
+        assert len(response.relevant_places.restaurants) == 2
 
 
 class TestErrorHandling:
@@ -251,8 +268,8 @@ class TestErrorHandling:
     def test_authentication_error(self, httpx_mock: HTTPXMock):
         """Test authentication error handling."""
         httpx_mock.add_response(
-            method="POST",
-            url="https://api.getcamino.ai/query",
+            method="GET",
+            url="https://api.getcamino.ai/query?query=test&rank=true&limit=20&offset=0&answer=false&mode=basic",
             status_code=401,
             json={"message": "Invalid API key"}
         )
@@ -266,8 +283,8 @@ class TestErrorHandling:
     def test_rate_limit_error(self, httpx_mock: HTTPXMock):
         """Test rate limit error handling."""
         httpx_mock.add_response(
-            method="POST",
-            url="https://api.getcamino.ai/query",
+            method="GET",
+            url="https://api.getcamino.ai/query?query=test&rank=true&limit=20&offset=0&answer=false&mode=basic",
             status_code=429,
             headers={"Retry-After": "60"},
             json={"message": "Rate limit exceeded"}
@@ -282,8 +299,8 @@ class TestErrorHandling:
     def test_generic_api_error(self, httpx_mock: HTTPXMock):
         """Test generic API error handling."""
         httpx_mock.add_response(
-            method="POST",
-            url="https://api.getcamino.ai/query",
+            method="GET",
+            url="https://api.getcamino.ai/query?query=test&rank=true&limit=20&offset=0&answer=false&mode=basic",
             status_code=500,
             json={"message": "Internal server error"}
         )
